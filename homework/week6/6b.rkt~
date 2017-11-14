@@ -1,0 +1,123 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-intermediate-reader.ss" "lang")((modname 6b) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+; Exercise 4
+(define-struct seat [number is-empty passenger-name])
+; A Seat is a (make-seat String Boolean String)
+ 
+; INTERPRETATION: A seat assignment on a plane, consisting of a
+; seat number ("34B"), whether or not it is empty, and the name of the
+; passenger if it is not empty.  If a seat assignment is empty, the
+; passenger name should be the empty string ("").
+; example:
+(define seat0 (make-seat "00A" #t ""))
+(define seat1 (make-seat "01A" #f "A1"))
+(define seat2 (make-seat "02A" #f "A2"))
+(define seat3 (make-seat "03A" #f "A3"))
+(define seat4 (make-seat "01B" #f "B1"))
+(define seat5 (make-seat "02B" #f "B2"))
+(define seat6 (make-seat "03B" #f "B3"))
+(define seat7 (make-seat "01C" #f "C1"))
+(define seat8 (make-seat "02C" #f "C2"))
+(define seat9 (make-seat "03C" #f "C3"))
+; template:
+#;(define (seat-temp s)
+    (...(seat-number s)...(seat-is-empty s)...(seat-passenger-name s)...))
+
+; A Flight is a List of Seat
+; INTERPRETATION: Represents the seats present in a given flight.
+; (The seats are not guaranteed to be ordered by seat number; it's just a
+; set of seats.)
+; examples:
+(define flight0 (list seat0))
+(define flight1 (list seat0 seat1 seat2 seat3))
+(define flight2 (list seat0 seat4 seat5 seat6))
+(define flight3 (list seat0 seat7 seat8 seat9))
+; template:
+#;(define (flight-temp f)
+    (cond
+      [(empty? f)...]
+      [(cons? f) ...(seat-temp (first f))
+                 ...(flight-temp (rest f))]))
+
+; seat-number?
+; string, flight -> boolean
+; accepts a seat number (a String) and a Flight,
+; and returns a Boolean representing whether or not
+; that seat number appears in the flight
+; examples:
+(check-expect (seat-number? "00A" flight1) #t)
+(check-expect (seat-number? "01C" flight2) #f)
+(define (seat-number? str flight)
+  (cond
+    [(empty? flight) #f]
+    [(cons? flight)
+     (if (string=? str (seat-number (first flight)))
+         #t
+         (seat-number? str (rest flight)))]))
+
+; Exercise 5
+; seat-dupes
+; flight -> list of string
+; accepts a Flight and returns a list of Strings representing all the
+; seat numbers that appear more than once in the flight.
+; example
+(check-expect (seat-dupes (list (make-seat "2A" #true "")
+                                (make-seat "2B" #true "")
+                                (make-seat "2C" #false "Wilson, C")
+                                (make-seat "2D" #true "")
+                                (make-seat "2A" #false "Mislove, A")
+                                (make-seat "2B" #true "")
+                                (make-seat "2C" #false "Naji, N")))
+              (list "2A" "2B" "2C"))
+(check-expect (seat-dupes (list (make-seat "5A" #true "")
+                                (make-seat "2D" #true "")
+                                (make-seat "2C" #false "Kyle, C")
+                                (make-seat "2D" #false "Xin, G")
+                                (make-seat "4A" #false "Mislove, A")
+                                (make-seat "2B" #false "Babara, S")
+                                (make-seat "2C" #false "Nick, N")))
+              (list "2D" "2C"))
+
+(define (seat-dupes flight)
+  (real-seat-dupes flight '() '()))
+; I wish I have a helper function that contains 3 arguments
+; the first is the flight and the second is what have already appeared
+; the last is what have been detected to be appeared more than once
+; flight, list of strings, list of strings -> list of strings
+(define (real-seat-dupes flight l out)
+  (cond
+    [(empty? flight) out]
+    [(cons? flight)
+     (if (compare-flight (first flight) l)
+         ; I wish I have a helper function that
+         ; help me compare the first flight with l
+         ; detect whether there is a flight has already appeared
+         (real-seat-dupes (rest flight)
+                          l
+                          ; I wish I have a function that add a element
+                          ; to the end of a list
+                          ; I call it scons
+                          (scons (seat-number(first flight)) out))
+         (real-seat-dupes (rest flight)
+                          (cons (seat-number(first flight)) l)
+                          out))]))
+
+; compare-flight
+; seat, list of strings -> boolean
+; compare the first flight with l
+; detect whether there is a flight has already appeared
+(define (compare-flight seat l)
+  (cond
+    [(empty? l) #f]
+    [(cons? l) (if (string=? (seat-number seat)(first l))
+                   #t
+                   (compare-flight seat (rest l)))]))
+
+; scons:
+; string, list of strings -> strings
+; add the element to the end of a list
+(define (scons str los)
+  (cond
+    [(empty? los) (cons str '())]
+    [(cons? los) (cons (first los)(scons str (rest los)))]))

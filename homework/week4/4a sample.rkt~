@@ -1,0 +1,71 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-beginner-reader.ss" "lang")((modname |4a sample|) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+;; Purpose: simulating a Forum
+;; that looks like Piazza andthis is the client program.
+;; It can reveive other people's
+;; answers to question from the server, 
+;; create new answer and new question
+
+;; When the client reveives entries of strings, it uses them as
+;; the state and display them on canvas
+
+;; When the client sends a answer
+;; The sever appends the string of the answer under the question
+
+;; a local is a (make-local string string string)
+;; it contains the NO. username and content of a single entry
+(define-struct local [id name content])
+;; template:
+#; (define (local-temp a-local)
+     (...(local-id a-local)...
+         (local-name a-local)...
+         (local-content a-local)...))
+
+;; a Server is a (make-Server boolean string)
+;; it illustrate weather it is an error and then display message from the server
+(define-struct Server [Er content])
+;; template:
+#; (define (Server-temp a-Server)
+     (...(Server-er a-Server)...
+         (server-content a-Server)...))
+
+;; a forum is a (make-forum local Server)
+;; it conbines the structure of local and server so the big-bang can
+;; regard the structure as world
+(define-struct forum [local Server])
+;; template:
+#; (define (forum-temp a-forum)
+     (...(forum-local a-forum)...
+         (forum-Server a-forum)...))
+
+;; In order to simplify the check expects
+;; some forum is defined here
+(define test1 (make-forum (make-local "1" "Max" "how are you?") (make-Server #f ""))
+
+;; a world is a forum
+;; forum -> forum
+#;(define (simple-forum str)
+    (big-bang str
+              [name ...]
+              [register ...]
+              [port ...]
+              [on-key type]                  ;; forum key -> forum
+              [on-tick send]                 ;; forum -> forum
+              [to-draw render]               ;; forum -> image
+              [on-reveive reveive]))         ;; forum string -> forum
+
+;; forum -> Package (of String and String)
+;; send the answer "I don't know" to the server
+(check-expect (send "I don't know the answer")
+              (make-package "answer: " "I don't know the answer"))
+(check-expect (send "Ask TA!") (make-package "answer: " "Ask TA!"))
+
+;; forum -> Image
+;; render the state of the forum as a text image with a 20 font in black
+(check-expect (render "how to design the forum client?")
+              (text "how to design the forum client?" 20 "black"))
+
+; forum String -> Client 
+; append the received word to the current state of the forum 
+(check-expect (receive "1" "23") "1 \\ 23")

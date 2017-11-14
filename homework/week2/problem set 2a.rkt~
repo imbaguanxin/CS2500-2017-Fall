@@ -1,0 +1,19 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-beginner-reader.ss" "lang")((modname |problem set 2a|) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+;Finger Exercise
+
+;minus 2 function
+(define (minus_2 num)
+  (- num 2)
+)
+
+;calculate distance function
+(define (distance t)
+  (+ 1.5 (* 1.5 t))
+)
+
+;turn graph to function
+(define (y-value x)
+  (+ 10 (* -1 x))
+)

@@ -1,0 +1,87 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-beginner-reader.ss" "lang")((modname |4a exercise 5 草稿|) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+(require 2htdp/universe)
+(require 2htdp/image)
+
+;; Exercise 5
+;; Purpose of Programe
+;; Design a Finite State Machine to exam user's input
+;; Its state changes according to user's input
+;; Change of state:
+;; START: haven’t seen any part of "good" yet
+;; G: have seen the intial "g"
+;; O1: have seen at least one "o"
+;; O2: have seen at least two "o"s
+;; D: have seen the final "d"
+
+(define-struct State[state])
+
+(define (Finite-State-Machine str)
+  (big-bang (make-State "white")
+            (on-key exam)
+            (to-draw render)))
+
+(define (exam s ke)
+  (cond
+    [(string=? (State-state s) "dark green")
+     (make-State "dark green")]
+    [(key=? ke "g")
+     (make-State "pale green")]
+    [(and (key=? ke "o") (string=? "pale green" (State-state s)))
+     (make-State "spring green")]
+    [(and (key=? ke "o") (string=? "spring green" (State-state s)))
+     (make-State "lime green")]
+    [(and (key=? ke "o") (string=? "lime green" (State-state s)))
+     (make-State "lime green")]
+    [(and (key=? ke "d") (string=? "lime green" (State-state s)))
+     (make-State "dark green")]
+    [else (make-State "white")]))
+
+(define (render s)
+           (rectangle 300 500 "solid" (State-state s)))
+
+(Finite-State-Machine "white")
+
+(require 2htdp/image)
+(require 2htdp/universe)
+
+;; Exercise 5
+;; Purpose of Programe
+;; Design a Finite State Machine to exam user's input
+;; Its state changes according to user's input
+;; Change of state:
+;; START: haven’t seen any part of "good" yet
+;; G: have seen the intial "g"
+;; O1: have seen at least one "o"
+;; O2: have seen at least two "o"s
+;; D: have seen the final "d"
+
+(define-struct State[text state])
+
+(define (Finite-State-Machine str)
+  (big-bang (make-State str "white")
+            (on-key exam)
+            (to-draw render)))
+
+(define (exam s ke)
+  (cond
+    [(string=? (State-state s) "dark green")
+     (make-State (string-append (State-text s) ke) "dark green")]
+    [(key=? ke "g")
+     (make-State (string-append (State-text s) "g")"pale green")]
+    [(and (key=? ke "o") (string=? "pale green" (State-state s)))
+     (make-State (string-append (State-text s) "o") "spring green")]
+    [(and (key=? ke "o") (string=? "spring green" (State-state s)))
+     (make-State (string-append (State-text s) "o") "lime green")]
+    [(and (key=? ke "o") (string=? "lime green" (State-state s)))
+     (make-State (string-append (State-text s) "o") "lime green")]
+    [(and (key=? ke "d") (string=? "lime green" (State-state s)))
+     (make-State (string-append (State-text s) "d") "dark green")]
+    [else (make-State (string-append (State-text s) ke) "white")]))
+
+(define (render s)
+  (overlay (text (State-text s) 20 "black")
+           (rectangle 300 500 "solid" (State-state s))))
+
+(Finite-State-Machine "")

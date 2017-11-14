@@ -1,0 +1,29 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-intermediate-reader.ss" "lang")((modname 9b) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+; A World is one of
+; - Viewall
+; - Threadview
+; - Newitem
+; - Search
+; INTERPRETATION: Represents four different "views" in your program.
+ 
+; A Viewall is a (make-viewall String History)
+; INTERPRETATION: The user is viewing all posts (but not replies), 
+;   and possibly typing a Command.
+(define-struct viewall [command history])
+; A Threadview is a (make-threadview Post History)
+; INTERPRETATION: The user is viewing a specific Post and its replies.
+(define-struct threadview [viewing history])
+; A Newitem is a (make-newitem [Maybe Natural] String History)
+; INTERPRETATION: The user is entering a new post (if the maybe is #false),
+;   or a new reply (if the maybe is a number).
+(define-struct newitem [id content history])
+; A Search is a (make-search History String)
+; INTERPRETATION: The user is trying to view only a subset
+;   of the existing messages.
+(define-struct search [history search])
+
+
+;---------------------------------------------------------------------------
+  

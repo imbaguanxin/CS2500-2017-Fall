@@ -1,0 +1,79 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-beginner-reader.ss" "lang")((modname 4b) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+(require 2htdp/universe)
+(require 2htdp/image)
+
+;; Exercise 5
+;; purpose: fram all of the given images that appear in a list
+;; cons -> cons
+
+;; examples:
+;; Firstly define some list of images
+(define A
+  (cons (circle 30 "solid" "red")
+        (cons (circle 30 "solid" "red")
+              (cons (circle 30 "solid" "red")
+                    (cons (circle 30 "solid" "red") '())))))
+(define B
+  (cons (square 60 "solid" "blue")
+        (cons (circle 30 "solid" "green")
+              (cons (right-triangle 60 60 "solid" "red") '()))))
+;; then add frames for defined lists of images
+(define A-f
+  (cons (frame (circle 30 "solid" "red"))
+        (cons (frame (circle 30 "solid" "red"))
+              (cons (frame (circle 30 "solid" "red"))
+                    (cons (frame (circle 30 "solid" "red")) '())))))
+(define B-f
+  (cons (frame (square 60 "solid" "blue"))
+        (cons (frame (circle 30 "solid" "green"))
+              (cons (frame (right-triangle 60 60 "solid" "red")) '()))))
+;; write the check expects: A becomes A-f and B becomes B-f
+(check-expect (picture-frames A) A-f)
+(check-expect (picture-frames B) B-f)
+
+(define (picture-frames lon)
+  (cond
+    [(empty? lon) '()]
+    [else (cons (frame (first lon)) (picture-frames (rest lon)))]))
+
+;; Exercise 6
+;; Purpose:
+;; computing the total area of a list of images
+;; Note: the area of a image is its size but not what it contants.
+;; Therefore the area is the length of the image times the width of the image
+;; cons -> number
+;; examples:
+;; the total area of A is 60*60*4=14400
+;; the total area of B is 60*60*3=10800
+(check-expect (total-area A) 14400)
+(check-expect (total-area B) 10800)
+
+(define (total-area lon)
+  (cond
+    [(empty? lon) 0]
+    [else (+ (* (image-width (first lon))(image-height (first lon)))
+             (total-area (rest lon)))]))
+
+;; Exercise 7
+;; Purpose:
+;; firtly shrink the images in a list
+;; then place the images in a list
+
+(define (shrink lon t)
+  (cond
+    [(empty? lon) '()]
+    [else
+     (cons (scale (expt 0.7 (- t (length lon))) (first lon)) (shrink (rest lon) t))]))
+ 
+(define (placing lon)
+  (cond
+    [(empty? lon) empty-image]
+    [else (beside/align "bottom" (first lon) (placing (rest lon)))]))
+
+(define (trailing-off lon)
+  (placing (shrink lon (length lon))))
+  
+
+

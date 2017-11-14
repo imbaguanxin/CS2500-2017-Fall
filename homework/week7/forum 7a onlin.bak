@@ -1,0 +1,267 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-intermediate-reader.ss" "lang")((modname |forum 7a onlin|) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+(require 2htdp/image)
+(require 2htdp/universe)
+(require 2htdp/string)
+;-------------------------------------------------------------------
+; A wordp (word processor) is (make-wordp string string)
+; it is the structure of the word processor
+; it devide the post and search into two parts
+; and I am going to insert an cursor between the two part
+(define-struct wordp [l r])
+; template:
+#;(define (wordp-temp a-wordp)
+    (...(wordp-l a-wordp)...
+        (wordp-r a-wordp)...))
+
+; A World is one of
+; - EditviewPosts
+; - SearchPosts
+; INTERPRETATION: Represents two different "views" in your program.
+
+(define-struct editview [edit history search])
+; A EditviewPosts is a (make-editview wordp History wordp)
+; INTERPRETATION: Means the user is viewing all posts and
+; potentially typing in a new one.
+; examples:
+(define edit0 (make-editview (make-wordp "" "")'() (make-wordp "" "")))
+(define edit1 (make-editview (make-wordp "editing" "") '() (make-wordp "" "")))
+(define edit2 (make-editview (make-wordp "editing" "") (list "1:a:a" "2:b:b" "3:c:c") (make-wordp "a" "")))
+(define edit3 (make-editview (make-wordp "editing" "") '() (make-wordp "a" "")))
+; template:
+#;(define (editview-temp ev)
+    (...(editview-edit)...
+        (history-temp (editview-history))...
+        (editview-search)....))
+
+(define-struct searchp [edit history search])
+; A SearchPosts   is a (make-search Edit History Search)
+; INTERPRETATION: Means the user is trying to view only a subset
+; of the existing messages.
+; examples:
+(define search0 (make-searchp (make-wordp "" "") '() (make-wordp "" "")))
+(define search1 (make-searchp (make-wordp "editing" "") '() (make-wordp "" "")))
+(define search2 (make-searchp (make-wordp "editing" "") (list "1:a:a" "2:b:b" "3:c:c") (make-wwordp "a" "")))
+(define search3 (make-searchp (make-wordp "editing" "") '() (make-wordp "a" "")))
+; template:
+#;(define (searchp-temp ev)
+    (...(searchp-edit)...
+        (history-temp (searchp-history))...
+        (searchp-search)....))
+
+;-----------------------------------------------------------
+; A History is a List of Strings
+; INTERPRETATION: the prior posts received from the server.
+; examples:
+(define h0 '())
+(define h1 (list "0:a:a"))
+(define h2 (list "0:a:a" "1:b:b" "3:c:c"))
+; template:
+(define (history-temp h)
+  (cond
+    [(empty? h) ...]
+    [(cons? h) ...(first h)...
+               ...(history-temp (rest h))...]))
+  
+;-------------------------------------------------------------
+; some constants:
+; Sever:
+(define the-server "dictionary.ccs.neu.edu")
+; the port
+(define the-port   10001)
+; a previous text window is a empty scene
+(define HISTORY (empty-scene 800 800))
+; a editing text window is a smaller empty scene
+(define TEXT (empty-scene 800 100))
+;-------------------------------------------------------------
+; editview helper:
+; edit-l-wordp is a helper function that take out
+; the "l" part (the part that is left to the cursor)
+; wholetext -> string
+(check-expect (edit-l-wordp edit0) "")
+(check-expect (edit-l-wordp edit1) "editing")
+(define (l-wordp s)
+  (wordp-l(editview-edit s)))
+
+; edit-r-wordp is a helper function that take out
+; the "r" part (the part that is right to the cursor)
+; wholetext -> string
+(check-expect (edit-r-wordp WT1) "456")
+(check-expect (edit-r-wordp WT2) " text")
+(define (r-wordp s)
+  (wordp-r (wholetext-wordp s)))
+;--------------------------------------------------------------
+(define (simple-net-forum str)
+  (big-bang w
+            [name            "guan.xin:1968"]
+            [register        the-server]
+            [port            the-port]
+            (cond
+              [(editview? w) [on-key  editmode]               ;editview key -> editview/searchp
+                             [to-draw render-edit]            ;editview -> image
+                             [on-receive receive-edit]]       ;editview -> editview   
+              [(searchp? w)  [on-key  searchmode]             ;searchp -> editview / searchp / package
+                             [on-key  render-search]          ;searchp -> image 
+                             [on-receive receive-edit]])))    ;searchp -> searchp
+
+;------------------------------------------------------
+;; editview branch:
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; render-edit
+;; draws how the forum shoud look like
+;; it display previous post on the history window
+;; and the unposted one on the edit window
+;; editview -> image
+;; exampls:
+(check-expect (render-edit edit0)
+              (above HISTORY TEXT))
+(check-expect (render-edit edit1)
+              (above HISTORY
+                     (overlay/align "left" "top"
+                                    (text "editing" 20 "black")
+                                    TEXT)))
+(check-expect (render-edit edit2)
+              (above (overlay/align "left top"
+                                    (above/align "left"
+                                                 (text "a:a" 20 "black")
+                                                 (text "b:b" 20 "black")
+                                                 (text "c:c" 20 "black"))
+                                    HISTORY)
+                     (overlay/align "left" "top"
+                                    (text "editing" 20 "black")
+                                    TEXT)))
+(check-expect (render-edit edit3)
+              (above HISTORY
+                     (overlay/align "left" "top"
+                                    (text "editing" 20 "black")
+                                    TEXT)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; editmode:
+;; editview -> editview / searchp / package
+;; it takes in an editview and react according to user's key action
+;; examples:
+
+;; 1. enter:
+;; it send out editing posts when the post is not empty
+;; and clear the currently editing post
+(check-expect (editmode edit0 "\r")
+              edit0)
+(check-expect (editmode edit1 "\r")
+              (make-package (make-editview "" '() "")
+                            "editing"))
+(check-expect (editmode edit2 "\r")
+              (make-package (make-editview "" (list "1:a:a" "2:b:b" "3:c:c") "a")
+                            "editing"))
+(check-expect (editmode edit3 "\r")
+              (make-package (make-editview "" '() "a")
+                            "editing"))
+
+;; 2. backspace:
+;; delete the last character in the edit part of editview
+;; it do nothing when the edit part is empty
+(check-expect (editmode edit0 "\b")
+              edit0)
+(check-expect (editmode edit1 "\b")
+              (make-editview "editin" '() ""))
+(check-expect (editmode edit2 "\b")
+              (make-editview "editin" (list "1:a:a" "2:b:b" "3:c:c") "a"))
+(check-expect (editmode edit3 "\b")
+              (make-editview "editin" '() "a"))
+
+;; 3. f2
+;; switch to search mode
+(check-expect (editmode edit0 "f2")
+              (make-searchp "" '() ""))
+(check-expect (editmode edit1 "f2")
+              (make-searchp "editing" '() ""))
+(check-expect (editmode edit2 "f2")
+              (make-searchp "editing" (list "1:a:a" "2:b:b" "3:c:c") "a"))
+(check-expect (editmode edit3 "f2")
+              (make-searchp "editing" '() "a"))
+
+;; 4. other keys
+;; add a character to the end of the edit part of editview
+(check-expect (editmode edit0 "f")
+              (make-editview "f" '() ""))
+(check-expect (editmode edit1 "2")
+              (make-editview "editing2" '() ""))            
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; receive-edit
+;; editview, string -> editview
+;; it renew the editview when receive a message from the server
+(check-expect (receive-edit edit0 "4:d:d")
+              (make-editview "" (list "4:d:d") ""))
+(check-expect (receive-edit edit2 "4:d:d")
+              (make-editview "editing" (list "1:a:a" "2:b:b" "3:c:c" "4:d:d") "a"))
+
+;-------------------------------------------------------------------
+;; searchp brench
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; render-search
+;; searchp -> image
+;; it shows the search result of given word
+(check-expect (render-search edit0)
+              (above HISTORY TEXT))
+(check-expect (render-search edit1)
+              (above HISTORY TEXT)
+              (check-expect (render-search edit2)
+                            (above (overlay/align "left top"
+                                                  (text "a:a" 20 "black")
+                                                  HISTORY)
+                                   (overlay/align "left" "top"
+                                                  (text "a" 20 "black")
+                                                  TEXT)))
+              (check-expect (render-search edit3)
+                            (above HISTORY
+                                   (overlay/align "left" "top"
+                                                  (text "a" 20 "black")
+                                                  TEXT)))
+
+              ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+              ;; search-mode:
+              ;; search-mode -> editview / searchp
+              ;; it takes in a searchp and react according to user's key action
+              ;; examples:
+
+              ;; 1. backspace:
+              ;; delete the last character in the search part of searchp
+              ;; it do nothing when the search part is empty
+              (check-expect (searchmode search0 "\b")
+                            search0)
+              (check-expect (searchmode search0 "\b")
+                            search1)
+              (check-expect (searchmode edit2 "\b")
+                            (make-searchp "editing" (list "1:a:a" "2:b:b" "3:c:c") ""))
+              (check-expect (searchmode edit3 "\b")
+                            (make-searchp "editing" '() ""))
+
+              ;; 2. f1
+              ;; switch to search mode
+              (check-expect (searchmode search0 "f2")
+                            (make-editview "" '() ""))
+              (check-expect (searchmode search1 "f2")
+                            (make-editview "editing" '() ""))
+              (check-expect (searchmode search2 "f2")
+                            (make-editview "editing" (list "1:a:a" "2:b:b" "3:c:c") "a"))
+              (check-expect (searchmode search3 "f2")
+                            (make-editview "editing" '() "a"))
+
+              ;; 3. other keys
+              ;; add a character to the end of the edit part of editview
+              (check-expect (searchmode edit0 "f")
+                            (make-searchp "" '() "f"))
+              (check-expect (searchmode edit1 "2")
+                            (make-searchp "editing" '() "2"))            
+
+              ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+              ;; receive-edit
+              ;; reveive the message from the server and add it to history
+              (check-expect (receive-search search0 "4:d:d")
+                            (make-search "" (list "4:d:d") ""))
+              (check-expect (receive-search search2 "4:d:d")
+                            (make-search "editing" (list "1:a:a" "2:b:b" "3:c:c" "4:d:d") "a"))

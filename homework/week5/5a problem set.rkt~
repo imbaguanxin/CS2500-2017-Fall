@@ -1,0 +1,58 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-beginner-reader.ss" "lang")((modname |5a problem set|) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+;;Exercise 5
+(define (eliminate lon n)
+  (cond
+    [(empty? lon)'()]
+    [(= n (first lon)) (eliminate (rest lon) n)]
+    [else (cons (first lon) (eliminate (rest lon) n))]))
+
+;---------------------------------------------------------
+;; Exercise 5 challenge
+;; takes a List of Numbers, and constructs a new list
+;; with any duplicate values removed (and keeping just
+;; a single one of the copies)
+
+;; I need two argument in the real-no-dups
+;; a list that contents numbers that are waiting for determing
+;; whether they should be a part of the new list
+;; another list that contents already existing numbers
+;; in order to help compare with rest of the numbers
+;; and this list is originally a empty list
+;; list of number, list of number -> list of number
+;; template:
+#;(define (lon-temp lon1 lon2)
+    (cond
+      [(empty? lon1) '()]
+      [(... (first lon1)... lon2)(...(first lon1)...(rest lon1)...lon2...)]
+      [else (...(first lon1)...(rest lon1)...lon2...)]))
+
+(define (real-no-dups lon test)
+  (cond
+    [(empty? lon) '()]
+    ;; I wish I have a helper function (duplicate? n lon) to
+    ;; determin whether the (first lon) equals one of the numbers in the test
+    [(duplicate? (first lon) test)(real-no-dups (rest lon) test)]
+    [else (cons (first lon) (real-no-dups (rest lon) (cons (first lon) test)))]))
+
+;; help function: duplicate? --- determins whether a given
+;; number equals one of the number in the given list of numbers
+;; number, list of number -> boolean
+;; template:
+#;(define (lon-temp num lon)
+    (cond
+      [(empty? lon) "a boolean"]
+      [(...(first lon)...n...) "a boolean"]
+      [else (lon-temp num (rest lon))]))
+
+(define (duplicate? n test)
+  (cond
+    [(empty? test) #f]
+    [(= (first test) n) #t]
+    [else (duplicate? n (rest test))]))
+
+;; the main function: no-dups
+;; list of number -> list of number
+(define (no-dups lon)
+  (real-no-dups lon '()))

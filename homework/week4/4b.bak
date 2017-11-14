@@ -1,0 +1,38 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-beginner-reader.ss" "lang")((modname 4b) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+(require 2htdp/universe)
+(require 2htdp/image)
+
+;; Exercise 5
+;; purpose: fram all of the given images that appear in a list
+;; cons -> cons
+;; examples:
+;; Firstly define some list of images
+(define A
+  (cons (circle 30 "solid" "red")
+        (cons (circle 30 "solid" "red")
+              (cons (circle 30 "solid" "red")
+                    (cons (circle 30 "solid" "red") '())))))
+(define B
+  (cons (square 30 "solid" "blue")
+        (cons (circle 30 "solid" "green")
+              (cons (triangle 30 "solid" "red") '()))))
+;; then add frames for defined lists of images
+(define A-f
+  (cons (frame (circle 30 "solid" "red"))
+        (cons (frame (circle 30 "solid" "red"))
+              (cons (frame (circle 30 "solid" "red"))
+                    (cons (frame (circle 30 "solid" "red")) '())))))
+(define B-f
+  (cons (frame (square 30 "solid" "blue"))
+        (cons (frame (circle 30 "solid" "green"))
+              (cons (frame (triangle 30 "solid" "red")) '()))))
+;; write the check expects: A becomes A-f and B becomes B-f
+(check-expects (picture-frames A) A-f)
+(check-expects (picture-frames B) B-f)
+(define (picture-frames lon)
+  (cond
+    [(empty? lon) '()]
+    [else (cons (frame (first lon)) (picture-frames (rest lon)))]))
+

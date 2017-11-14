@@ -1,0 +1,80 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-beginner-reader.ss" "lang")((modname |problem set 2b 最终|) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+(require 2htdp/image)
+(require 2htdp/universe)
+
+;evaluate the difference between speed and speed limit
+;given two numbers produce a string based on their comparison
+;a speed less than or equal to the speed limit is considered *fine*
+;a speed greater than the speed limit by at most 5 is considered *dangerous*
+;any other speed greater than the speed limit by at least 6 or more is considered *ticket*
+(define (ticket s l)
+  (cond
+    [(<= s l) "fine"]
+    [(<= s (+ l 5)) "danger"]
+    [else (string-append "ticket " "you drove " (number->string s) " mph")]))
+    
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;lets simulate a typewriter
+;display the string "qwerty" as text sequentially
+;template
+(define (typewrite s)
+  (place-image (text (substring "qwerty" 0 s) 50 "black")
+              200 200
+               (rectangle 400 400 "solid" "white")))
+;A world is a number
+(big-bang 0
+  [to-draw typewrite];;World -> Image and knows how to draw the current world
+  [on-tick add1 1 6];;World -> World and knows how to update the current world
+  [close-on-stop #t])
+
+;Design typewrite
+;compute the next string after the initial one
+;typewrite: World -> Image (String -> String)
+
+#; (define (typewrite s)
+     ...)
+(check-expect (typewrite 4)
+              (place-image (text (substring "qwerty" 0 4) 50 "black")
+              200 200
+               (rectangle 400 400 "solid" "white")))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;Lets simulate a typewriter backspacing
+;Dsiplay letters being removed from a given string
+(define (main txt)
+  (big-bang (string-append " " txt " ")
+          (on-tick next 1)      ; text -> text
+          (to-draw draw-text)  ; text -> Image
+          (stop-when stop?)   ; text -> Boolean
+          (close-on-stop #t)))
+
+;;text -> Image
+;;Draw the current text on a blank scene
+#;(define (draw-text txt)
+    ...)
+(define (draw-text txt) ;draw the world according to time
+  (overlay
+   (text txt 30 "olive")
+   (empty-scene 500 300)))
+
+(check-expect (draw-text "qwert")
+              (overlay
+               (text "qwert" 30 "olive")
+               (empty-scene 500 300)))
+
+;;text -> text
+;;Gives the next text
+#;(define (next txt)
+     substring txt...)
+(define (next txt)
+  (substring txt 0 (- (string-length txt) 1)))
+
+(check-expect (next "qwerty") "qwert")
+
+;;text -> Boolean
+;;Check if the text was wiped out if it is then stop
+#;(define (stop? txt)
+    ... stringlength txt)
+(define (stop? txt)
+  (= (string-length txt) 0))

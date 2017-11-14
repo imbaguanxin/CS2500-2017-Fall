@@ -1,0 +1,151 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-beginner-reader.ss" "lang")((modname 6a) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+;Exercise 4
+(define-struct contact [name phone])
+; A Contact is a (make-contact String Number)
+; template:
+#;(define (contact-temp contact)
+    (...(contact-name contact)...(contact-phone contact)...))
+; An AddressBook is one of:
+; - '()
+; - (cons Contact AddressBook)
+; INTERPRETATION: A list of contacts, with their names and addresses
+; examples:
+(define AddressBook1 (list (make-contact "Alice" 111)
+                           (make-contact "Bob" 222)
+                           (make-contact "Cindy" 333)))
+(define AddressBook2 (list (make-contact "Bob" 222)
+                           (make-contact "Cindy" 333)))
+(define AddressBook3 '())
+; template:
+#;(define (AddressBook-temp add)
+    (cond
+      [(empty? add)...]
+      [(cons? add) ...(first add)...
+                   ...(AddressBook-temp (rest add))...]))
+ 
+; A MaybeNumber is one of
+; - #false
+; - Number
+; INTERPRETATION: Represents maybe having a number
+; examples:
+(define contact1 (make-contact "Alice" 111))
+(define contact2 (make-contact "Bob" 222))
+(define contact3 (make-contact "Cindy" 333))
+; template:
+#;(define (MaybeNumber-temp MN)
+    (cond
+      [(boolean? MN)...]
+      [(number? MN)...]))
+
+; String, AddressBook -> MaybeNumber
+; find-contact:
+; accepts a String representing the name of a contact
+; and an AddressBook, and returns a MaybeNumber: either
+; the first Number in the AddressBook for a Contact
+; with that name, or if such a contact does not exist,
+; find-contact should return #false
+
+; examles:
+(check-expect (find-contact "Alice" AddressBook1) 111)
+(check-expect (find-contact "Cindy" AddressBook2) 333)
+(check-expect (find-contact "Bob" AddressBook3) #f)
+; main function:
+(define (find-contact str add)
+  (cond
+    [(empty? add) #f]
+    [(cons? add)
+     (if (string=? str (contact-name(first add)))
+         (contact-phone (first add))
+         (find-contact str (rest add)))]))
+
+;------------------------------------------------------------
+; Exercies 5
+; A Size is one of:
+; - "small"
+; - "medium"
+; - "large"
+(define-struct drip-coffee [cream size])
+(define-struct latte [size])
+(define-struct cortado [size])
+
+
+; A Coffee is one of:
+; - (make-drip-coffee Boolean Size)
+; - (make-latte Size)
+; - (make-cortado Size)
+; INTERPRETATION: Represents three possible coffee orders.  Each order 
+; has a size; drip coffee might also have cream in it.
+; examples:
+(define coffee1 (make-drip-coffee #t "small"))
+(define coffee2 (make-drip-coffee #f "large"))
+(define coffee3 (make-latte "small"))
+(define coffee4 (make-latte "medium"))
+(define coffee5 (make-latte "large"))
+(define coffee6 (make-cortado "small"))
+(define coffee7 (make-cortado "medium"))
+(define coffee8 (make-cortado "large"))
+; template:
+#;(define (Coffee-temp coffee)
+    (cond
+      [(drip-coffee? coffee)
+       (...(drip-coffee-cream drip)... (drip-coffee-size drip)...)]
+      [(latte? coffee) (...(latte-size latte)...)]
+      [(cortado? coffee) (...(latte-size latte)...)]))
+ 
+; A CoffeeOrder is a List-of-Coffee
+; INTERPRETATION: The list of coffee orders at a local coffee shop
+; example:
+(define list1 (list coffee1 coffee2 coffee3))
+(define list2 (list coffee3 coffee5 coffee7))
+; template:
+#;(define (list-of-coffee-temp loc)
+    (cond
+      [(empty? loc)...]
+      [(cons? loc)...(coffee-temp (first loc))...
+                  ...(list-of-coffee-tep (rest loc))...]))
+
+; A MaybeCoffee is one of
+; - #false
+; - Coffee
+; INTERPRETATION: Represents maybe having a Coffee
+; example:
+(define maybecoffee1 #f)
+(define maybecoffee2 (make-cortado "small"))
+; template:
+#;(define (maybecoffee-temp mc)
+    (cond
+      [(boolean? mc) ...]
+      [(drip-coffee? coffee)
+       (...(drip-coffee-cream drip)... (drip-coffee-size drip)...)]
+      [(latte? coffee) (...(latte-size latte)...)]
+      [(cortado? coffee) (...(latte-size latte)...)]))
+
+; function: last-latte
+; CoffeeOrder -> Coffee / boolean
+; interpretation: accepts a CoffeeOrder and returns a Coffee
+; representing the last latte order (i.e., a (make-latte ...))
+; in the list. If there are no lattes in the CoffeeOrder
+; it returns #false
+; examples:
+(check-expect (last-latte list1) coffee3)
+(check-expect (last-latte list2) coffee5)
+; main function:
+(define (last-latte co)
+  (real-last-latte co #f))
+
+; I need another argument to contain the information about potential last latte
+; so i develop a helper function real-last-latte
+; signature: CoffeOrder, coffee / boolean -> coffee / #f
+; I set the initinal value to be #f in main function
+; if the helper function dectacts a latte, it will replace the #f or latte with
+; the latte it detects. If not, the argument remain what it was.
+; when the function have scanned all of the coffeeorder it returns the argument
+(define (real-last-latte co coffee)
+  (cond
+    [(empty? co) coffee]
+    [(cons? co)
+     (if (latte? (first co))
+         (real-last-latte (rest co) (first co))
+         (real-last-latte (rest co) coffee))]))

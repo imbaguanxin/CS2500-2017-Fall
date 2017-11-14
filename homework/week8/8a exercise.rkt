@@ -1,0 +1,121 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-intermediate-reader.ss" "lang")((modname |8a exercise|) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+(require 2htdp/image)
+
+(define-struct tweet [author text])
+(define-struct image-tweet [author text image])
+(define-struct retweet [author tweet])
+; A Tweet is one of:
+; - (make-tweet String String)
+; - (make-image-tweet String String Image)
+; - (make-retweet String Tweet)
+; INTERPRETATION:  A tweet is either a message (make-tweet),
+; a message and an image (make-image-tweet), or a retweet
+; of another tweet (make-retweet).  All tweets have authors.
+; template:
+#;(define (tweet-temp t)
+    (cond
+      [(tweet? t) ...(tweet-author t)...(tweet-text t)...]
+      [(image-tweet? t)...(image-tweet-author t)
+                       ...(image-tweet-text t)
+                       ...(image-tweet-image t)]
+      [(retweet? t) ...(retweet-author t)...(retwet-tweet t)...]))
+; examples:
+(define tweet1 (make-tweet "foo" "bar"))
+(define tweet2 (make-retweet "baz"
+                             (make-retweet "balh"
+                                           (make-image-tweet "arg" "circle"
+                                                             (empty-scene 100 100)))))
+(define tweet3 (make-image-tweet "arg" "circle"
+                                 (empty-scene 100 100)))
+
+; A Feed is a [List-of Tweet]
+; INTERPREATION:  A list of the Tweets in a user's feed.
+; [list-of tweets] -> number
+; examples:
+(define tweets1 (list (make-tweet "foo" "bar")
+                      (make-retweet "baz"
+                                    (make-retweet "balh"
+                                                  (make-image-tweet "arg" "circle"
+                                                                    (empty-scene 100 100))))))
+; template:
+#;(define (Feed-temp t)
+    (cond
+      [(empty? t) ...]
+      [(tweet? (first t))
+       ...(tweet-temp (first t))...(Feed-temp (rest t))...]
+      [(retweet? (first t))
+       ...(tweet-temp (first t))...(Feed-temp (rest t))...]
+      [(image-tweet? (first t))
+       ...(tweet-temp (first t)...(Feed-temp (rest t)...))]))
+
+(check-expect (count-tweets.v1 tweets1) 4)
+(check-expect (count-tweets.v1 '()) 0)
+(check-expect (count-tweets.v1 (list (make-tweet "A" "a"))) 1)
+
+(define (count-tweets.v1 t)
+  ; I need an argument to record the number of tweets that I already counted
+  ; So I build a new function called count-tweets.v1.0
+  ; list of Tweets, number -> number
+  ; (check-expect (count-tweets.v1.0 (tweets1 0)) 4)
+  (local
+    ((define (count-tweets.v1.0 t n)
+       (cond
+         [(empty? t) (+ 0 n)]
+         [(tweet? (first t))
+          (count-tweets.v1.0 (rest t) (+ 1 n))]
+         [(image-tweet? (first t))
+          (count-tweets.v1.0 (rest t) (+ 1 n))]
+         [(retweet? (first t))
+          (count-tweets.v1.0 (cons (retweet-tweet (first t)) (rest t)) (+ 1 n))])))
+    (count-tweets.v1.0 t 0)))
+
+;Exercise 2
+; Purpose: count the tweets in a feed
+; list of tweets -> number
+; examples:
+;(check-expect (count-tweets.v2 tweets1) 4)
+(check-expect (count-tweets.v2 '()) 0)
+(check-expect (count-tweets.v2 (list (make-tweet "A" "a"))) 1)
+(check-expect (count-tweets.v2 tweets1) 4)
+
+(define (count-tweets.v2 t)
+  (local
+    (; map; [X Y] [X -> Y] [List-of X] -> [List of Y]
+     ; X = tweets Y = number
+     ; I need helper function to convert tweets to the number of tweets
+     ; foldr: [X Y] [X -> Y] Y [List of x]-> Y
+     ; X = number
+     ; Y = number
+     ; it adds up all the tweet number
+
+     ; turn-to-number:
+     ; image tweet and tweet means there is 1 tweet, retweet may
+     ; contain multiple tweets
+     ; Tweet / '() -> number
+     ; examples:
+     ; (check-expect (turn-to-number (make-tweet "" "")) 1)
+     ; (check-expect (turn-to-number (make-image-tweet "arg" "circle"(empty-scene 100 100))) 1)
+     ; (check-expect (turn-to-number (make-retweet "" (make-tweet "" ""))) 2)
+     (define (turn-to-number t)
+       (cond
+         [(or (tweet? t) (image-tweet? t)) 1]
+         [(retweet? t) (count-retweet t)]))
+     ; I need a helper function to count the number of tweets in a retweet
+     ; retweet -> number
+     ; examples:
+     ; (check-expect (count-retweet (make-retweet "b" (make-retweet "a" (make-tweet "c" "d")))) 3)
+     (define (count-retweet t)
+       (local
+         ; I need an argument to record the number of retweets that I have already counted
+         ; count-retweet1
+         ; retweet/image-tweet/tweet number -> number
+         ; (check-expect
+         ; (count-retweet1 (make-retweet "b" (make-retweet "a" (make-tweet "c" "d"))) 0) 3)
+         ((define (count-retweet1 t n)
+            (cond
+              [(or (image-tweet? t) (tweet? t)) (+ 1 n)]
+              [(retweet? t) (count-retweet1 (retweet-tweet t) (+ 1 n))])))
+         (count-retweet1 t 0))))
+    (foldr + 0 (map turn-to-number t))))

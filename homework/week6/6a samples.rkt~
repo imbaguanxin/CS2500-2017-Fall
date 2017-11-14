@@ -1,0 +1,119 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-intermediate-reader.ss" "lang")((modname |6a samples|) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+(require 2htdp/image)
+(require 2htdp/universe)
+(require 2htdp/string)
+
+; A World is one of
+; - EditviewPosts
+; - SearchPosts
+; INTERPRETATION: Represents two different "views" in your program.
+
+(define-struct editview [edit history search])
+; A EditviewPosts is a (make-editview Edit History Search)
+; INTERPRETATION: Means the user is viewing all posts and
+; potentially typing in a new one.
+; examples:
+(define edit0 (make-editview "" '() ""))
+(define edit1 (make-editview "editing" '() ""))
+(define edit2 (make-editview "edit" (list "0:a:a" "1:b:b" "3:c:c") "a"))
+(define edit3 (make-editview "editing" '() "a"))
+; template:
+#;(define (editview-temp ev)
+    (...(editview-edit)...
+        (history-temp (editview-history))...
+        (editview-search)....))
+
+(define-struct searchp [edit history search])
+; A SearchPosts   is a (make-search Edit History Search)
+; INTERPRETATION: Means the user is trying to view only a subset
+; of the existing messages.
+; examples:
+(define search0 (make-searchp "" '() ""))
+(define search1 (make-searchp "editing" '() ""))
+(define search2 (make-searchp "edit" (list "h1" "h2" "h3") "h1"))
+(define search3 (make-searchp "editing" '() "h1"))
+; template:
+#;(define (searchp-temp ev)
+    (...(searchp-edit)...
+        (history-temp (searchp-history))...
+        (searchp-search)....))
+
+; A Edit is a String
+; INTERPRETATION: the contents of the post the user is currently
+; editing.
+; exampls:
+(define edit0 "")
+(define edit1 "111111")
+(define edit2 "222222")
+(define edit3 "333333")
+; template:
+(define edit-temp e
+  (...))
+
+; A History is a List of Strings
+; INTERPRETATION: the prior posts received from the server.
+; examples:
+(define h0 '())
+(define h1 (list "0:a:a"))
+(define h2 (list "0:a:a" "1:b:b" "3:c:c"))
+; template:
+(define (history-temp h)
+  (cond
+    [(empty? h) ...]
+    [(cons? h) ...(first h)...
+               ...(history-temp (rest h))...]))
+
+; A Search is a string 
+; INTERPRETATION: the current search term the user is looking for
+; examples:
+(define s0 "")
+(define s1 "a")
+(define s2 "bc")
+; template:
+#;(define (seach-temp s)
+    (...))
+  
+;-------------------------------------------------------------
+; some constants:
+; Sever:
+(define the-server "dictionary.ccs.neu.edu")
+; the port
+(define the-port   10001)
+; a previous text window is a empty scene
+(define HISTORY (empty-scene 800 800))
+; a editing text window is a smaller empty scene
+(define TEXT (empty-scene 800 100))
+;-------------------------------------------------------------
+(define (simple-net-forum str)
+  (big-bang w
+            [name            "guan.xin:1968"]
+            [register        the-server]
+            [port            the-port]
+            (cond
+              [(editview? w) [on-key  editmode]               ;editview -> editview/searchp
+                             [to-draw render-edit]            ;editview -> image
+                             [on-receive receive-edit]]       ;editview -> editview   
+              [(searchp? w)  [on-key  searchmode]             ;searchp -> editview/searchp
+                             [on-key  render-search]          ;searchp -> image 
+                             [on-receive receive-edit]])))    ;searchp -> searchp
+
+;------------------------------------------------------
+;; editview branch:
+
+;; render-edit
+;; draws how the forum shoud look like
+;; it display previous post on the history window
+;; and the unposted one on the edit window
+;; editview -> image
+;; exampls:
+(check-expect (render-edit edit0)
+              (above HISTORY TEXT))
+(check-expect (render-edit edit1)
+              (above HISTORY
+                     (overlay/align "left" "top"
+                                    (text "editing" 20 "black")
+                                    HISTORY)))
+(check-expect (render-edit edit2)
+              (above ()

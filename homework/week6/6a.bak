@@ -1,0 +1,35 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-beginner-reader.ss" "lang")((modname 6a) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+;Exercise 4
+(define-struct contact [name phone])
+; A Contact is a (make-contact String Number)
+ 
+; An AddressBook is one of:
+; - '()
+; - (cons Contact AddressBook)
+; INTERPRETATION: A list of contacts, with their names and addresses
+; template:
+#;(define (AddressBook-temp add)
+    (cond
+      [(empty? add)...]
+      [(cons? add) ...(first add)...
+                   ...(AddressBook-temp (rest add))...]))
+ 
+; A MaybeNumber is one of
+; - #false
+; - Number
+; INTERPRETATION: Represents maybe having a number
+; template:
+#;(define (MaybeNumber-temp MN)
+    (cond
+      [(boolean? MN)...]
+      [(number? MN)...]))
+
+; String, AddressBook -> MaybeNumber
+; find-contact:
+; accepts a String representing the name of a contact
+; and an AddressBook, and returns a MaybeNumber: either
+; the first Number in the AddressBook for a Contact
+; with that name, or if such a contact does not exist,
+; find-contact should return #false

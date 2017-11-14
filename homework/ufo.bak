@@ -1,0 +1,75 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-beginner-reader.ss" "lang")((modname ufo) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+(require 2htdp/universe)
+(require 2htdp/image)
+(define V 100)
+(define UFO
+  (circle 20 "solid" "blue"))
+
+(define TANK
+  (place-image
+   (rectangle 5 30 "solid" "black")
+   20 10
+   (above
+    (rectangle 40 10 "solid" "white")
+    (beside
+     (rectangle 10 40 "solid" "black")
+     (square 20 "solid" "dark green")
+     (rectangle 10 40 "solid" "black")))))
+
+(define (change-x a-posn dx)
+  (make-posn
+   dx
+   (posn-y a-posn)))
+
+(define (change-y a-posn dy)
+  (make-posn
+   (posn-x a-posn)
+   dy))
+
+(define (read-x world)
+  (posn-x world))
+
+(define (read-y world)
+  (posn-y world))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define (main x-of-tank UFO-posn)
+  (big-bang (make-posn x-of-tank UFO-posn)
+            (on-tick next 0.5)
+            (on-key position)
+            (to-draw game)))
+
+(define (position world key)
+  (cond
+    [(key=? key "left") (change-x world (- (posn-x world) 50))]
+    [(key=? key "right") (change-x world (+ (posn-x world) 50))]
+    ;[(key=? key " ") (read-x world)]
+    [else world]))
+
+(define (next world)
+  (make-posn
+   (posn-x world)
+   (+ 1 ;(random 6)
+      (posn-y world))
+   ))
+
+(define (x-UFO world)
+  (* V (remainder (posn-y world) (/ 1600 V))))
+
+(define (y-UFO world)
+  (+ 50 (* 100 (floor (/ (posn-y world) (/ 1600 V) )))))
+
+(define (game world)
+  (place-image
+   UFO
+   (x-UFO world)
+   (y-UFO world)
+  ;(overlay
+   ;(text (number->string (x-UFO world)) 30 "olive")
+   (place-image
+    TANK
+    (posn-x world) 850
+    (empty-scene 1600 900))))
+
+(main 800 0)

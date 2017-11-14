@@ -1,0 +1,28 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-intermediate-reader.ss" "lang")((modname 6b) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+; Exercise 4
+(define-struct seat [number is-empty passenger-name])
+; A Seat is a (make-seat String Boolean String)
+ 
+; INTERPRETATION: A seat assignment on a plane, consisting of a
+; seat number ("34B"), whether or not it is empty, and the name of the
+; passenger if it is not empty.  If a seat assignment is empty, the
+; passenger name should be the empty string ("").
+; example:
+(define seat0 (make-seat "00A" #f ""))
+(define seat1 (make-seat "01A" #t "A1"))
+(define seat2 (make-seat "02A" #t "A2"))
+(define seat3 (make-seat "03A" #t "A3"))
+(define seat4 (make-seat "01B" #t "B1"))
+(define seat5 (make-seat "02B" #t "B2"))
+(define seat6 (make-seat "03B" #t "B3"))
+(define seat7 (make-seat "01C" #t "C1"))
+(define seat8 (make-seat "02C" #t "C2"))
+(define seat9 (make-seat "03C" #t "C3"))
+; A Flight is a List of Seat
+; INTERPRETATION: Represents the seats present in a given flight.
+; (The seats are not guaranteed to be ordered by seat number; it's just a
+; set of seats.)
+
+; seat-number?

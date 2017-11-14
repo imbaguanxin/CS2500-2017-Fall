@@ -1,0 +1,159 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-intermediate-reader.ss" "lang")((modname 7b) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+; Exercise 3
+;----------------------------------------
+; part 1
+; the first common abstracted function of inf and sup
+; non-empty lists of numbers, function -> non-empty lists of numbers
+; determines the largest number in a list when type in > as the second argument
+; determines the smallest number in a list when type in < as the second argument
+; examples:
+(check-expect (inf-sup '(0) <) 0)
+(check-expect (inf-sup '(0) >) 0)
+(check-expect (inf-sup '(1 3 5 4 6 4 3 7) <) 1)
+(check-expect (inf-sup '(1 3 5 4 6 4 3 7) >) 7)
+; (x) [x -> boolean] [list of x]-> [list of x]
+(define (inf-sup nelon f)
+  (cond
+    [(empty? (rest nelon)) (first nelon)]
+    [else
+     (if (f (first nelon)
+            (inf-sup (rest nelon) f))
+         (first nelon)
+         (inf-sup (rest nelon) f))]))
+
+; part 2
+; inf-1:
+; purpose: find out the smallest number in the list
+; examples:
+(check-expect (inf-1 '(25 24 23 22 21 20)) 20)
+(check-expect (inf-1 '(1)) 1)
+; non-empty list of numbers -> number
+(define (inf-1 lon)
+  (inf-sup lon <))
+; sup-1:
+; purpose: find out the biggest number in the list
+; examples:
+(check-expect (sup-1 '(25 24 23 22 21 20)) 25)
+(check-expect (sup-1 '(1)) 1)
+; none-empty list of numbers -> number
+(define (sup-1 lon)
+  (inf-sup lon >))
+
+; part 3
+; sup-1 and inf-1 calculates whether the first element in the list is smaller
+; or bigger than the maximum or minimum of the rest of the list, thus program
+; have to find out the maximum or minimum in the fest of list, which means the
+; program continus the processes. That is to say, to determin whether the first
+; is the largest or smallest number, the program calculates all the maximum or minimum
+; in its sub list. For example, to determine whether 25 is the minimum in
+; the list '(25 24 23 ... 1) the program have to compare 24 to the minimum of '(23 22 21 ... 1)
+; which invovles comparation of 23 to the minimum of ' (22 21 ... 1)....
+; all the way to compare 2 with 1.
+; it is a time consuming job.
+; What's worse, for example, the list '(25 24 23 ... 1) is in an decreasing order, 
+; so the minimum is at the end of the whole list, which means, after determining that 
+; 25 is not the smallest, the program tries 24, 23, 22... all the way to 1.
+; when determing whether 24 is the minimum, all the steps have been done in the process
+; of 25. Thus, the program is repeatly doing some steps and consume much time to complete.
+; I am doing 25+24+23+...+1 comparisons here and 24+23+22+...+1 comparisons are repeated.
+; These functions are slow because each recursive call iterates through
+; a subset of the list up to the end
+
+
+; part 4
+; define new inf and sup using min or max
+; Nelon -> Number
+; determines the smallest 
+; number on l
+; example:
+(check-expect (inf '(1)) 1)
+(check-expect (inf (list 25 24 23 22 21 20 19 18 17 16 15 14 13
+                         12 11 10 9 8 7 6 5 4 3 2 1)) 1)
+(define (inf l)
+  (cond
+    [(empty? (rest l))
+     (first l)]
+    [else (min (first l)(inf (rest l)))]))
+
+; Nelon -> Number
+; determines the largest 
+; number on l
+; example:
+(check-expect (sup '(1)) 1)
+(check-expect (sup (list 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+                         17 18 19 20 21 22 23 24 25)) 25)
+(define (sup l)
+  (cond
+    [(empty? (rest l))
+     (first l)]
+    [else (max (first l)(sup (rest l)))]))
+
+; part 5
+; second common abstraction of sup and inf
+; (x) [x x -> x] [list of x] -> x
+; examples:
+(check-expect (inf-sup-2 '(0) min) 0)
+(check-expect (inf-sup-2 '(0) max) 0)
+(check-expect (inf-sup-2 (list 25 24 23 22 21 20 19 18 17 16 15 14 13
+                               12 11 10 9 8 7 6 5 4 3 2 1) min) 1)
+(check-expect (inf-sup-2 (list 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+                               17 18 19 20 21 22 23 24 25) max) 25)
+(define (inf-sup-2 l f)
+  (cond
+    [(empty? (rest l))
+     (first l)]
+    [else (f (first l)(inf-sup-2 (rest l) f))]))
+
+; part 6
+; compared to the original sup and inf, the new one skips the repetitive steps,
+; for example in the case of (inf '(25 24 23 ... 1)), the new one doesn't 
+; determine whether 25 is the smallest, then 24, 23 ... all the way to 1 which involves
+; repetitive steps in each determination. Instead, the new one compare 25 with the
+; minimum of the rest in the list, which is one and then pick one as the minimum.
+; All the repetitive steps are neglected in the new inf and new sup.
+; These functions are faster because each recursive call does only one comparison
+; instead of comparing the element to every element in the subset.
+;---------------------------------------------------------------------
+
+; Exercise 4
+; A [Maybe X] is one of: 
+; – #false 
+; – X
+; Interpret these data definitions: 
+; [Maybe String], [Maybe [List-of String]], and [List-of [Maybe String]].
+
+; [Maybe String] is a string or a #f
+; A [Maybe string] is one of: 
+; – #false 
+; – string
+; if there is no string in it, it shows a #f
+
+; [Maybe [List-of String]] is a list of strings or an #f
+; A [Maybe [List-of String]] is one of: 
+; – #false 
+; – [List-of String]
+; if there is no list of string in it, it shows a #f
+
+; [List-of [Maybe String]]
+; A [List-of [Maybe String]] is one of
+; - '()
+; - [Maybe String]
+; it is a list of [Maybe String]
+
+; String [List-of String] -> [Maybe [List-of String]]
+; returns the remainder of los starting with s 
+; #false otherwise
+(check-expect (occurs "a" '()) #f)
+(check-expect (occurs "a" (list "b" "a" "d" "e"))
+              (list "d" "e"))
+(check-expect (occurs "a" (list "b" "c" "d")) #f)
+
+(define (occurs s los)
+  (cond
+    [(empty? los) #f]
+    [(cons? los)
+     (if (string=? s (first los))
+         (rest los)
+         (occurs s (rest los)))]))

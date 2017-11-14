@@ -1,0 +1,43 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-beginner-reader.ss" "lang")((modname |problem set 2b|) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+(require 2htdp/image)
+;Exercise 1
+(define (fx x)
+  (+ 12 (* x x))
+  )
+(fx 0)
+(fx 2)
+(fx 5)
+(fx 9)
+
+;Exercise 2
+(define x 1)
+(define (math-is-boring x)
+  (+ (* -4 (expt x 3)) (* 8 (expt x 1)) (* 9 (expt x 0))))
+(math-is-boring 1)
+
+;Exercise 3
+(define (hello x)
+  (cond
+    [(string=? "Ben" x) (string-append "Dear " x ", Esquire:")]
+    [(string=? "Nada" x) (string-append "Dear " x ", Esquirette:")]
+    [else (string-append "Greetings, " x ", ")]))
+;hello consumes string
+
+;Exercise 4
+(define (render-string t)
+  (overlay
+   (text (substring "qwerty" 0 t) 22 "blue")
+   (rectangle 200 100 "solid" "white")
+   )
+  )
+   
+;Exercise 7
+(define (ticket s l)
+  (cond
+    [(< s l) "fine"]
+    [(<= s (+ l 5)) "danger"]
+    [else (string-append "ticket" "you drove " (number->string s) " mph")]
+    )
+  )

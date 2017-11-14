@@ -1,0 +1,475 @@
+(require 2htdp/image)
+(require 2htdp/universe)
+(require racket/string)
+
+; Server with which program will communicate
+(define the-server "dictionary.ccs.neu.edu") 
+; Access port within the server
+(define the-port 10006)
+; User credentials
+(define the-name "mehrabani.k:9016")
+
+; A Client is one of
+; - Viewall
+; - Threadview
+; - Newitem
+; - Search
+; - (make-package Viewall ClientMsg)
+; - PostError
+; INTERPRETATION: Represents four different "views" in your program.
+
+; A Viewall is a (make-viewall Buffer History)
+; INTERPRETATION: The user is viewing all posts (but not replies), 
+;   and possibly typing a Command.
+
+; A Threadview is a (make-threadview Post History)
+; INTERPRETATION: The user is viewing a specific Post and its replies.
+
+; A Newitem is a (make-newitem [Maybe Natural] Buffer History)
+; INTERPRETATION: The user is entering a new post (if the maybe is #false),
+;   or a new reply (if the maybe is a number).  
+
+; A Search is a (make-search History Buffer)
+; INTERPRETATION: The user is trying to view only a subset
+;   of the existing messages.
+
+(define-struct viewall [cmd log])
+(define-struct threadview [post log])
+(define-struct newitem [mid msg log])
+(define-struct search [log query])
+
+; A ClientMsg is one of
+; - "CATCHUP"                     <<== ask server to send old posts
+; - (list "POST" String)          <<== create new post with given text
+; - (list "REPLY" Natural String) <<== reply to post with this id, and given text
+
+; A ServerMsg is one of:
+; - (list "POST" Natural String String)  <<== new post (id, author, content)
+; - (list "REPLY" Natural String String) <<== new reply (post id, author, content)
+; - (list "ERROR" String)                <<== something went wrong
+
+; A History is a [List-of Post]
+; INTERPRETATION: the history of top-level posts seen so far.
+
+; A Post is one of
+; - (list Number (make-post String String [List-of Reply]))
+; - where the Number is the Post ID
+(define-struct post [author contents replies])
+; - author is the name of the author
+; - contents is the message
+; - replies is a list of replies to the post
+
+; A Post-Error is a (make-post-error String History)
+(define-struct post-error [contents log])
+; - where contents is the description of the error
+
+; A Reply is a (make-reply Number String Buffer)
+(define-struct reply [author contents])
+; - author is the name of the author
+; - and contents is the message
+
+; A Buffer is a (make-buffer String String)
+(define-struct buffer [left right])
+; Interpretation: Message or search query being typed stored in sections
+; to the left and right of the cursor
+
+(define empty-buffer (make-buffer "" ""))
+
+; forum : Client -> Client
+; A messaging program that provides viewing, editing, sending, and receiving of messages
+(define (forum username server port-number)
+  (big-bang (make-viewall empty-buffer '())
+            [name username]
+            [register server]
+            [port port-number]
+            [on-key key-handler]
+            [to-draw draw 600 500]
+            [on-receive receive-handler]))
+
+; key-handler : Client -> Client
+; Updates the given Client based on the key input given
+(define (key-handler c k)
+  (cond
+    [(string=? k "f1") (make-viewall (client-active c) (client-log c))]
+    [(string=? k "f2") (make-search (client-log c) (client-active c))]
+    [(and (string=? k "\r") (viewall? c)) (process-command c)]
+    [(and (string=? k "\r") (newitem? c)) (send-handler c)]
+    [(and (post-error? c) (string=? k "\r")) (make-viewall empty-buffer (post-error-log c))]
+    [(string=? k "\b") 
+     (update-client c
+                    (make-buffer (string-init (buffer-left (client-active c)))
+                                 (buffer-right (client-active c)))
+                    (client-log c))]
+    [(string=? k "\u007F")
+     (update-client c
+                    (make-buffer (buffer-left (client-active c))
+                                 (string-tail (buffer-right (client-active c))))
+                    (client-log c))]
+    [(string=? k "left")
+     (update-client c
+                    (make-buffer
+                      (string-init (buffer-left (client-active c)))
+                      (string-append (string-last (buffer-left (client-active c)))
+                                     (buffer-right (client-active c))))
+                    (client-log c))]
+    [(string=? k "right")
+     (update-client c
+                    (make-buffer (string-append (buffer-left (client-active c))
+                                                (string-head (buffer-right (client-active c))))
+                                 (string-tail (buffer-right (client-active c))))
+                    (client-log c))]
+    [(= (string-length k) 1)
+     (update-client c
+                    (make-buffer (string-append (buffer-left (client-active c)) k)
+                                 (buffer-right (client-active c)))
+                    (client-log c))]
+    [else c]))
+
+; process-command : Viewall -> Client
+; Executes commands in Viewall mode
+(define (process-command v)
+  (local
+    [(define split (string-split (buffer->string (viewall-cmd v))))]
+    (cond
+      [(string=? (first split) "clear")
+       (make-viewall empty-buffer '())]
+      [(string=? (first split) "catchup")
+       (make-package (make-viewall empty-buffer '()) "CATCHUP")]
+      [(string=? (first split) "new")
+       (make-newitem #f empty-buffer (viewall-log v))]
+      [(string=? (first split) "reply")
+       (make-newitem (string->number (second split)) empty-buffer (viewall-log v))]
+      [(string=? (first split) "view")
+       (make-threadview (assoc (string->number (second split)) (viewall-log v)) (viewall-log v))]
+      [else (make-post-error "invalid command" (viewall-log v))])))
+
+; send-handler : Newitem -> Client
+; Executes commands in the client buffer and rejects invalid messages before sending to the server
+(define (send-handler n)
+  (cond 
+    [(string=? (buffer->string (newitem-msg n)) "") n]
+    [(number? (newitem-mid n)) 
+     (make-package (make-viewall empty-buffer (newitem-log n)) 
+                   (list "REPLY" (newitem-mid n) (buffer->string (newitem-msg n))))]
+    [else 
+     (make-package (make-viewall empty-buffer (newitem-log n))
+                   (list "POST" (buffer->string (newitem-msg n))))]))
+
+; (check-expect (send-handler (make-editview empty-buffer '() empty-buffer))
+;               (make-editview empty-buffer '() empty-buffer))
+; (check-expect (send-handler (make-editview (make-buffer "Hi how " "are you?") '() empty-buffer))
+;               (make-package (make-editview empty-buffer '() empty-buffer)
+;                             (list "POST" "Hi how are you?")))
+; (check-expect (send-handler (make-editview (make-buffer "Hi how " "are you?")
+;                                            (list (list 1 (make-post "mehrabani.k" 
+;                                                                     "Hey what's up?" 
+;                                                                     '())))
+;                                            empty-buffer))
+;               (make-package (make-editview empty-buffer
+;                                            (list (list 1 (make-post "mehrabani.k"
+;                                                                     "Hey what's up?"
+;                                                                     '())))
+;                                            empty-buffer)
+;                             (list "POST" "Hi how are you?")))
+; (check-expect (send-handler (make-editview (make-buffer "\\cl" "ear") '() empty-buffer))
+;               (make-editview empty-buffer '() empty-buffer))
+
+; receive-handler : Client ServerMsg -> Client
+; Adds the message sent by the server to the client log
+(define (receive-handler c m)
+  (cond 
+    [(string=? "ERROR" (first m))
+     (make-post-error (second m) (client-log c))]
+    [(string=? "POST" (first m)) 
+     (update-client c
+                    (client-active c)
+                    (append (client-log c) 
+                            (list (list (second m) (make-post (third m) (fourth m) '())))))]
+    [(string=? "REPLY" (first m))
+     (update-client c
+                    (client-active c)
+                    (add-reply (client-log c) m))]))
+
+; (check-expect (receive-handler (make-editview empty-buffer 
+;                                               (list (list 1 (make-post "mehrabani.k" 
+;                                                                        "Hey there." 
+;                                                                        '()))) 
+;                                               empty-buffer) 
+;                                (list "ERROR" "1234"))
+;               (make-editview empty-buffer 
+;                              (list (list 1 (make-post "mehrabani.k" "Hey there." '())) 
+;                                    (make-post-error "ERROR: 1234")) 
+;                              empty-buffer))
+; (check-expect (receive-handler (make-searchposts empty-buffer 
+;                                                  (list (list 1 (make-post "mehrabani.k"
+;                                                                           "Hey there."
+;                                                                           '()))) 
+;                                                  empty-buffer)
+;                                (list "ERROR" "1234"))
+;               (make-searchposts empty-buffer 
+;                                 (list (list 1 (make-post "mehrabani.k" "Hey there." '())) 
+;                                       (make-post-error "ERROR: 1234")) 
+;                                 empty-buffer))
+; (check-expect (receive-handler (make-editview empty-buffer 
+;                                               (list (list 1 (make-post "bob" "Hey there." '()))) 
+;                                               empty-buffer) 
+;                                (list "POST" 2 "mehrabani.k" "ERROR"))
+;               (make-editview empty-buffer 
+;                              (list (list 1 (make-post "bob" "Hey there." '())) 
+;                                    (list 2 (make-post "mehrabani.k" "ERROR" '()))) 
+;                              empty-buffer))
+; (check-expect (receive-handler (make-editview empty-buffer 
+;                                               (list (list 1 (make-post "albanese.p"
+;                                                                        "Hey there."
+;                                                                        '()))) 
+;                                               empty-buffer) 
+;                                (list "POST" 0 "bob" "hi"))
+;               (make-editview empty-buffer 
+;                              (list (list 1 (make-post "albanese.p" "Hey there." '())) 
+;                                    (list 0 (make-post "bob" "hi" '()))) 
+;                              empty-buffer))
+
+
+; draw : Client -> Image
+; Draws the log and buffer from the latest Client state
+(define (draw c)
+  (local
+    [(define (contains-query? p) (string-contains? (post-contents (second p))
+                                                   (buffer->string (client-active c))))
+     (define (above/align-left x y) (above/align "left" x y))
+     (define processed-images
+       (cond 
+         [(search? c) (map draw-post-and-replies (filter contains-query? (client-log c)))]
+         [(threadview? c) (list (draw-post-and-replies (threadview-post c)))]
+         [else (map draw-post-and-replies (client-log c))]))
+     (define acc
+       (cond
+         [(post-error? c) 
+          (above/align "left"
+                       (line 600 0 "purple")
+                       (text (string-append (post-error-contents c) "; press ENTER to continue") 
+                             15 "red"))]
+         [(threadview? c) 
+          (above/align "left"
+                       (line 600 0 "purple")
+                       (text (string-append "viewing: " 
+                                            (number->string (first (threadview-post c)))) 
+                             15 "orange"))]
+         [(search? c)
+          (above/align "left"
+                       (line 600 0 "purple")
+                       (beside (text (string-append "search: " (buffer-left (client-active c))) 
+                                     15 
+                                     "teal") 
+                               (rectangle 1 16 "solid" "teal")
+                               (text (buffer-right (client-active c)) 15 "teal")))]
+         [(viewall? c)
+          (above/align "left"
+                       (line 600 0 "purple")
+                       (beside (text (string-append "command: " (buffer-left (client-active c))) 
+                                     15 
+                                     "dark green") 
+                               (rectangle 1 16 "solid" "dark green")
+                               (text (buffer-right (client-active c)) 15 "dark green")))]
+         [(newitem? c)
+          (above/align "left"
+                       (line 600 0 "purple")
+                       (beside (text (string-append the-name ": " (buffer-left (client-active c))) 
+                                     15 
+                                     "blue") 
+                               (rectangle 1 16 "solid" "blue")
+                               (text (buffer-right (client-active c)) 15 "blue")))]))]
+    (foldr above/align-left acc processed-images)))
+
+
+; (check-expect (draw (make-editview (make-buffer "Hey " "there.")
+;                                    '()
+;                                    empty-buffer))
+;               (above/align "left"
+;                            (line 600 0 "purple")
+;                            (beside (text (string-append the-name ": " "Hey ") 15 "blue")
+;                                    (rectangle 1 16 "solid" "blue")
+;                                    (text "there." 15 "blue"))))
+; (check-expect (draw (make-searchposts (make-buffer "Hey " "there.")
+;                                       '()
+;                                       empty-buffer))
+;               (above/align "left"
+;                            (line 600 0 "purple")
+;                            (beside (text (string-append the-name ": " "Hey ") 15 "blue")
+;                                    (rectangle 1 16 "solid" "blue")
+;                                    (text "there." 15 "blue"))))
+
+; (check-expect (draw (make-editview (make-buffer "Hey how " "are you?")
+;                                    (list (list 1 (make-post "bob" "Hey there." '())))
+;                                    empty-buffer))
+;               (above/align "left"
+;                            (text "1 bob: Hey there." 15 "maroon")
+;                            (line 600 0 "purple")
+;                            (beside (text "mehrabani.k:9016: Hey how " 15 "blue")
+;                                    (rectangle 1 16 "solid" "blue")
+;                                    (text "are you?" 15 "blue"))))
+; (check-expect (draw (make-searchposts (make-buffer "there" "")
+;                                       (list (list 1 (make-post "bob" "Hey there." '())))
+;                                       (make-buffer "Hey how " "are you?")))
+;               (above/align "left"
+;                            (text "1 bob: Hey there." 15 "teal")
+;                            (line 600 0 "purple")
+;                            (beside (text "mehrabani.k:9016: there" 15 "blue")
+;                                    (rectangle 1 16 "solid" "blue"))))
+
+; (check-expect (draw (make-editview (make-buffer "Hey how " "are you?")
+;                                    (list (list 1 (make-post "bob" "Hey there." '())))
+;                                    (make-buffer "su" "per")))
+;               (above/align "left"
+;                            (text "1 bob: Hey there." 15 "maroon")
+;                            (draw (make-editview (make-buffer "Hey how " "are you?")
+;                                                 '()
+;                                                 (make-buffer "su" "per")))))
+
+;-----------------------------------------------------------------------------------------------------
+; Helper Functions
+
+; update-client : Client Buffer History -> Client
+; Makes a Client that has the type of the given Client and with the applicable given fields
+(define (update-client c b h)
+  (cond
+    [(viewall? c)    (make-viewall b h)]
+    [(newitem? c)    (make-newitem (newitem-mid c) b h)]
+    [(threadview? c) (make-threadview (threadview-post c) h)]
+    [(search? c)     (make-search h b)]
+    [(post-error? c) (make-post-error (post-error-contents c) h)]))
+
+; client-active : Client -> Buffer
+; Extracts the first Buffer from the given Client, regardless of what kind of Client it is
+(define (client-active c)
+  (cond
+    [(viewall? c)    (viewall-cmd c)]
+    [(threadview? c) empty-buffer]
+    [(newitem? c)    (newitem-msg c)]
+    [(search? c)     (search-query c)]
+    [(post-error? c) (post-error-contents c)]))
+
+; client-log : Client -> [List-of String]
+; Extracts the log from the given Client, regardless of what kind of Client it is
+(define (client-log c)
+  (cond
+    [(viewall? c)    (viewall-log c)]
+    [(threadview? c) (threadview-log c)]
+    [(newitem? c)    (newitem-log c)]
+    [(search? c)     (search-log c)]
+    [(post-error? c) (post-error-log c)]))
+
+; client-saved : Client -> Buffer
+; Extracts the second Buffer from the given Client, regardless of what kind of Client it is
+; (define (client-saved c)
+;   (cond
+;     [(editview? c) (editview-search c)]
+;     [(searchposts? c) (searchposts-buffer c)]))
+
+; buffer->string : Buffer -> String
+; Collapses a Buffer into a String
+(define (buffer->string b)
+  (string-append (buffer-left b) (buffer-right b)))
+
+(check-expect (buffer->string empty-buffer) "")
+(check-expect (buffer->string (make-buffer "a" "")) "a")
+(check-expect (buffer->string (make-buffer "" "b")) "b")
+(check-expect (buffer->string (make-buffer "a" "b")) "ab")
+
+; add-reply : History ServerMsg -> History
+; Adds the reply provided by the server to the relevant post in the History
+(define (add-reply h r)
+  (local
+    [(define mp (assoc (second r) h))]
+    (cond
+      [(false? mp) h]
+      [else (replace-post h (list (first mp)
+                                  (make-post (post-author (second mp))
+                                             (post-contents (second mp))
+                                             (append (post-replies (second mp)) 
+                                                     (list (make-reply (third r) (fourth r)))))))])))
+(define history (list (list 1 (make-post "pete" "a" '())) 
+                      (list 2 (make-post "nick" "b" '())) 
+                      (list 3 (make-post "dan" "c" '()))))
+(check-expect (add-reply history (list "REPLY" 1 "kian" "d"))
+              (list (list 1 (make-post "pete" "a" (list (make-reply "kian" "d")))) 
+                    (list 2 (make-post "nick" "b" '())) 
+                    (list 3 (make-post "dan" "c" '()))))
+(check-expect (add-reply '() (list "REPLY" 1 "kian" "d")) '())
+
+; replace-post : History Post -> History
+; Replaces the given post in the given History
+(define (replace-post h p)
+  (local
+    [(define (replace-on-id ph) (cond 
+                                  [(= (first ph) (first p)) p]
+                                  [else ph]))]
+    (map replace-on-id h)))
+
+(check-expect (replace-post history (list 1 (make-post "kian" "d" '())))
+              (list (list 1 (make-post "kian" "d" '())) 
+                    (list 2 (make-post "nick" "b" '())) 
+                    (list 3 (make-post "dan" "c" '()))))
+(check-expect (replace-post '() (list 1 (make-post "kian" "d" '()))) '())
+
+; draw-post-and-replies : Post Color -> Image
+(define (draw-post-and-replies p)
+  (local
+    [(define (acc-reply r a) (above/align "left" a (text (string-append "   -> " 
+                                                                        (reply-author r) 
+                                                                        ": " 
+                                                                        (reply-contents r)) 
+                                                         15 
+                                                         "brown")))]
+    (above/align "left"
+                 (text (string-append (number->string (first p))
+                                      " | " 
+                                      (post-author (second p)) 
+                                      ": " 
+                                      (post-contents (second p)))
+                       15 "maroon")
+                 (foldr acc-reply empty-image (post-replies (second p))))))
+
+(check-expect (draw-post-and-replies (list 1 (make-post "pete" "a" (list (make-reply "kian" "d")))))
+              (above/align "left"
+                           (text "1 | pete: a" 15 "maroon")
+                           (text "   -> kian: d" 15 "brown")))
+
+;-----------------------------------------------------------------------------------------------------
+; A suite of String manipulation functions for changing the buffer
+
+; string-init : String -> String
+; string-init returns every part of the string except the last character
+(define (string-init s)
+  (substring s 0 (max 0 (sub1 (string-length s)))))
+
+(check-expect (string-init "test") "tes")
+(check-expect (string-init "t") "")
+(check-expect (string-init "") "")
+
+; string-last : String -> String
+; string-last returns the last character of the string
+(define (string-last s)
+  (substring s (max 0 (sub1 (string-length s)))))
+
+(check-expect (string-last "tested") "d")
+(check-expect (string-last "t") "t")
+(check-expect (string-last "") "")
+
+; string-head : String -> String
+; Returns the first character in a string
+(define (string-head s)
+  (substring s 0 (min 1 (string-length s))))
+
+(check-expect (string-head "tested") "t")
+(check-expect (string-head "t") "t")
+(check-expect (string-head "") "")
+
+; string-tail : String -> String
+; Returns everything except the head of the string
+(define (string-tail s)
+  (substring s (min 1 (string-length s))))
+
+(check-expect (string-tail "test") "est")
+(check-expect (string-tail "t") "")
+(check-expect (string-tail "") "")

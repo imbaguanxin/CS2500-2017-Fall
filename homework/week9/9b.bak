@@ -1,0 +1,405 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-intermediate-reader.ss" "lang")((modname 9b) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+(require 2htdp/image)
+(require 2htdp/universe)
+;;-------------------------------------------------------------------
+;; PURPOSE:
+;; simiulate pizza
+
+;---------------------------------------------------------------------------
+; A wordp (word processor) is (make-wordp string string)
+; it is the structure of the word processor
+; it devide the post and search into two parts
+; and I am going to insert an cursor between the two part
+(define-struct wordp [l r])
+; template:
+#;(define (wordp-temp a-wordp)
+    (...(wordp-l a-wordp)...
+        (wordp-r a-wordp)...))
+
+; A Reply is a (make-reply number string string)
+(define-struct reply [author content])
+; INTERPRETATION: author and content
+; examples:
+(define reply1 (make-reply "Kate" "Good morning!"))
+(define reply2 (make-reply "Kyle" "Good!"))
+(define reply3 (make-reply "Murphy" "cheer!"))
+; template:
+(define (reply-temp p)
+  (...(reply-author p)...(reply-content p)))
+
+; A Post is a (list Number (make-post number string string [list of replys]))
+(define-struct post [id author content reply])
+; INTERPRETATION: The ID# of a post, the author,
+;                 teh content of a post and list of replys of the post
+; examples:
+(define post1 (make-post 1 "Alex" "Good morning!" (list reply1 reply2)))
+(define post2 (make-post 2 "Benn" "What's up!" (list reply3)))
+(define post3 (make-post 3 "Cathrine" "deadline delayed" '()))
+; template:
+(define (post-temp p)
+  (...(post-id p)...(post-author p)...(post-content p)...(reply-temp(post-reply p))...))
+
+;; A History is one of
+;; - List of posts
+;; - string
+;; INTERPRETATION: the history of top-level posts seen so far. the string represents error message.
+;; examples:
+(define h0 '())
+(define h1 (list post1 post2))
+(define h2 (list post1 post2 post3))
+;; template:
+#;(define (history-temp h)
+    (cond
+      [(empty? h) ...]
+      [(cons? h)
+       (cond
+         [(post? (first h)) ...(post-temp (first h))...]
+         [(string? (first h)) ...])
+       ...(history-temp (rest h))...]))
+
+;-----------------------------------------------------------------
+; A World is one of
+; - Viewall
+; - Threadview
+; - Newitem
+; - Search
+; INTERPRETATION: Represents four different "views" in your program.
+ 
+; A Viewall is a (make-viewall Wordp History)
+; INTERPRETATION: The user is viewing all posts (but not replies), 
+;   and possibly typing a Command.
+(define-struct viewall [command history])
+; A Threadview is a (make-threadview Post History)
+; INTERPRETATION: The user is viewing a specific Post and its replies.
+(define-struct threadview [viewing history])
+; A Newitem is a (make-newitem [Maybe Natural] Wordp History)
+; INTERPRETATION: The user is entering a new post (if the maybe is #false),
+;   or a new reply (if the maybe is a number).
+(define-struct newitem [id content history])
+; A Search is a (make-search History Wordp)
+; INTERPRETATION: The user is trying to view only a subset
+;   of the existing messages.
+(define-struct search [history search])
+;-------------------------------------------------------------
+;; some constants:
+;; Sever:
+(define the-server "dictionary.ccs.neu.edu")
+;; the port
+(define the-port   10009)
+;; a previous text window is a empty scene
+(define HISTORY (empty-scene 800 800))
+;; a editing text window is a smaller empty scene
+(define TEXT (empty-scene 800 100))
+;; a small rectangle stands for a curosr on the last line
+(define CURSOR (rectangle 2 18 "solid" "red"))
+;-------------------------------------------------------------
+; main function:
+(define (simple-net-forum dont-care)
+  (big-bang edit0
+            [name            "guan.xin:1968"]
+            [register        the-server]
+            [port            the-port]
+            [on-key          keyhandler]              ;world key -> viewall/searchp/package
+            [to-draw         render]                  ;world -> image
+            [on-receive      receive-message] ))      ;world -> viewall/searchp   
+;------------------------------------------------------
+
+; graded helper
+
+; replace-post
+; searches for a Post in the given History that has the same
+; ID# as the given Post, and replaces it with the given Post.
+; history post -> post
+(check-expect (replace-post h1 (make-post 2 "Max" "Game" '()))
+              (list post1 (make-post 2 "Max" "Game" '())))
+(define (replace-post history post)
+  (local
+    ; map: [x y] [x -> y] {list of x -> list of y}
+    ; x = post y = post
+    ; HELPER:
+    ; replace-old:
+    ; if the examing post id equals to that of the given post
+    ; -> given post, else return the examed post
+    ; post -> post
+    ; (check-expect (replace-old post2) (make-post 2 "Max" "Game" '())) 
+    ((define (replace-old p)
+       (cond
+         [(= (post-id p) (post-id post)) post]
+         [else p])))
+    (map replace-old history)))
+
+; add-reply:
+; takes a current History and a "REPLY" ServerMsg,
+; and adds a Reply to the relevant Post in the History
+; history servermsg -> history
+(check-expect (add-reply h1 (list "REPLY" 2 "name" "content"))
+              (list
+               (make-post 1 "Alex" "Good morning!"
+                          (list (make-reply "Kate" "Good morning!")(make-reply "Kyle" "Good!")))
+               (make-post 2 "Benn" "What's up!"
+                          (list (make-reply "Murphy" "cheer!")(make-reply "name" "content")))))
+(define (add-reply history replymsg)
+  (local
+    ; filter: [x] [x -> boolean] [list of x -> list of x]
+    ; x = post
+    ; HELPER:
+    ; find-history
+    ; post -> boolean
+    ; if the examing post shares the same id with the replymsg it is true
+    ; (check-expect (find-history post2) #t) (replymsg is in the overall check-expect)
+    ((define (find-history post)
+       (= (second replymsg) (post-id post)))
+     ; Helper:
+     ; insert-reply
+     ; adds an reply at the end of the reply list
+     ; post -> post
+     ; (insert-reply post2) -> adds the given reply at the end of replies
+     (define (insert-reply post)
+       (make-post
+        (post-id post)
+        (post-author post)
+        (post-content post)
+        (addback (make-reply (third replymsg) (fourth replymsg))
+                 (post-reply post)))))
+    (replace-post history (insert-reply(first(filter find-history history))))))
+
+; Helper: above-left
+; INTERPRETATION: place an image on another to the left
+; example
+(check-expect (above-left (circle 10 "solid" "black")
+                          (circle 20 "solid" "green"))
+              (above/align "left"
+                           (circle 10 "solid" "black")
+                           (circle 20 "solid" "green")))
+; image image -> image
+(define (above-left i1 i2)
+  (above/align "left" i1 i2))
+
+; draw-post-and-replies:
+; INTERPRETATION: turn a post to a picture
+; post -> image
+; examples:
+(check-expect (draw-post-and-replies post1)
+              (above/align "left"
+                           (text "Post1-author:Alex- Good morning!" 20 "black")
+                           (text "Reply-author:Kate- Good morning!" 15 "blue")
+                           (text "Reply-author:Kyle- Good!" 15 "blue")))
+(check-expect (draw-post-and-replies post2)
+              (above/align "left"
+                           (text "Post2-author:Benn- What's up!" 20 "black")
+                           (text "Reply-author:Murphy- cheer!" 15 "blue")))
+  
+
+(define (draw-post-and-replies post)
+  (local
+    ; HELPER: draw-replies
+    ; arrage replies to one picture
+    ; [list of replies] -> image
+    ((define (draw-replies lor)
+       (local
+         ; map:
+         ; [x y] [x -> y] [list of x] -> [list of y]\
+         ; x = reply
+         ; y = image
+         ; foldr:
+         ; [x y] [x y -> y] y [list of x] -> y
+         ; x = image y = image
+
+         ; NEED helper:
+         ; draw-replies:
+         ; INTERPRETATION: turn replies to a picture
+         ((define (draw-replies reply)
+            (text (string-append "Reply-author:" (reply-author reply) "- " (reply-content reply))
+                  15 "blue")))
+         (foldr above-left empty-image (map draw-replies lor)))))
+    (above/align
+     "left"
+     (text
+      (string-append "Post"
+                     (number->string (post-id post))
+                     "-author:"
+                     (post-author post)
+                     "- "
+                     (post-content post))
+      20 "black")
+     (draw-replies (post-reply post)))))
+;------------------------------------------------------
+
+;; I need to split the function according to world.
+;; when on-key, to-draw, on-receive is called
+;; I have to go to different brench.
+;; examples are in sub-brenches
+
+;; keyhandler:
+;; PURPOSE: respond to different key
+;; world -> world
+(define (keyhandler w ke)
+  (cond [(viewall? w) (viewall-key w ke)]
+        [(threadview? w) (threadview-key w ke)]
+        [(newitem? w) (newitem-key w ke)]
+        [(search? w) (search-key w ke)]))
+
+;; render:
+;; PURPOSE: draw the UI according to world
+;; viewall/threadview/newitem/search -> image
+(define (render w)
+  (cond [(viewall? w) (viewall-render w)]
+        [(threadview? w) (threadview-render w)]
+        [(newitem? w) (newitem-render w)]
+        [(search? w) (search-render w)]))
+
+;; receive-message
+;; PURPOSE: receive message from the server and add it to history
+;; viewall/searchp string -> viewall/searchp
+(define (receive-message w m)
+  (cond [(viewall? w) (receive-edit w m)]
+        [(searchp? w) (receive-search w m)]))
+
+;; append-wordp
+;; PURPOSE: append wordps in all worlds
+;; viewall/newitem/search -> string
+(define (append-wordp x)
+  (cond
+    [(viewall? x) (string-append (wordp-l (viewall-command x)) (wordp-r (viewall-command x)))]
+    [(newitem? x) (string-append (wordp-l (newitem-content x)) (wordp-r (newitem-content x)))]
+    [(search? x) (string-append (wordp-l (search-search x)) (wordp-r (search-search x)))]))
+;---------------------------------------------------
+; keyhandler section:
+; 1.viewall handler
+(define (viewall-key va ke)
+  (cond
+    
+    [(string=? ke "\r")
+     (cond
+       [(string=? "" (append-wordp va)) va]
+       [else
+        (cond
+          [(command-new? (append-wordp va))
+           (make-newitem #f (make-wordp "" "") (viewall-history va))]
+          [(command-view? (append-wordp va))
+           (search-viewall-history va)]
+          [(command-reply? (append-wordp))
+           (write-reply (append-wordp))]
+          [(command-catchup? (append-wordp))
+           (make-package (make-viewall (make-wordp "" "") (viewall-history va))
+                         "CATCHUP")]
+          [else va])])]
+    
+    [(string=? ke "\b")
+     (make-viewall (<=back (viewall-command va))
+                   ; I wish I have a helper function to process the backspace
+                   (viewall-history va))]
+    
+    [(string=? ke "f5")
+     (make-viewall (make-wordp "" "")
+                   (viewall-history va))]
+    
+    [(string=? ke "left")
+     (make-viewall (<-move (viewall-command va))
+                   ; i wish I have a helper function to move the cursor to
+                   ; the left
+                   (viewall-history va))]
+
+    [(string=? ke "right")
+     (make-viewall (->move (viewall-command va))
+                   ; i wish I have a helper function to move the cursor to
+                   ; the right
+                   (viewall-history va))]
+    
+    [(= 1 (string-length ke))
+     (make-viewall (addch (viewall-command va) ke)
+                   ; I wish I have a helper function to add characters to wordp
+                   (viewall-history va))]
+    
+    [else va]))
+
+
+;=============================================================
+;; helper function: command-new?
+(define (command-new? str)
+  (and (= (string-length str) 3 )
+       (string=? "new" (substring str 0 3))))
+
+;; helper function: command-view?
+(define (command-view? str)
+  (and (>= (string-length str) 6 )
+       (string=? "view " (substring str 0 5))))
+
+;; helper function: view-history
+(define (search-viewall-history va)
+  (local
+    ((define (correct-number? str)
+       (number? (string->number (substring str 6 (string-length str)))))
+     (define (search-post va)
+       (local
+         ((define (=id? post)
+            (= (post-id post)
+               (string->number (substring (append-wordp va) 6 (string-length (append-wordp va)))))))
+         (first (filter =id? (viewall-history va))))))
+    (if (correct-number? (append-wordp va))
+        (make-threadview (search-post va)
+                         (viewall-history va))
+        va)))
+
+;; helper function: command-reply?
+(define (command-reply? str)
+  (and (>= (string-length str) 7)
+       (string=? "reply " (substring str 0 6))))
+
+;; helper function: write-reply
+(define (write-reply va)
+  (local
+    ((define number
+       (string->number (substring (append-wordp va) 7 (string-length (append-wordp va)))))
+     (define maybenumber
+       (number? number)))
+    (if maybenumber
+        (make-newitem number
+                      (make-wordp "" "")
+                      (viewall-history va))
+        va)))
+
+;; helper function: <=back
+;; wordp -> wordp
+;; delete the last character in the left part of wordp
+;; examples:
+(check-expect (<=back (make-wordp "" "a"))(make-wordp "" "a"))
+(check-expect (<=back (make-wordp "kk" "ii")) (make-wordp "k" "ii"))
+(define (<=back wp)
+  (if (string=? (wordp-l wp) "")
+      wp
+      (make-wordp
+       (substring (wordp-l wp) 0 (- (string-length (wordp-l wp)) 1))
+       (wordp-r wp))))
+
+;; helper function: addch
+;; wordp string -> wordp
+;; add a character to last character in the left part of wrodp
+(define (addch wp str)
+  (make-wordp
+   (string-append (wordp-l wp) str)
+   (wordp-r wp)))
+
+;; helper function: <-move
+;; wordp -> wordp
+;; move the cursor to the left
+(define (<-move wp)
+  (if (string=? (wordp-l wp) "")
+      wp
+      (make-wordp (substring (wordp-l wp) 0 (- (string-length (wordp-l wp)) 1))
+                  (string-append 
+                   (substring (wordp-l wp)
+                              (- (string-length (wordp-l wp)) 1)
+                              (string-length (wordp-l wp)))
+                   (wordp-r wp)))))
+
+;; helper function: ->move
+;; wordp -> wordp
+;; move the cursor to the right
+(define (->move wp)
+  (if (string=? (wordp-r wp) "")
+      wp
+      (make-wordp (string-append (wordp-l wp)(substring (wordp-r wp)0 1))
+                  (substring (wordp-r wp) 1 (string-length (wordp-r wp))))))
