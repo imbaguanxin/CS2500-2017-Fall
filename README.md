@@ -2,7 +2,7 @@
 
 - ***Course Name***: Fundmental of Computer Science 1
 - ***Course Number***: CS2500
-- ***Institution***: Northeastern University KCCS
+- ***Institution***: Northeastern University Khoury College of Computer Sciences
 - ***Instructor***: Christopher King (c.king@northeastern.edu)
 - ***Time***: 2017 Fall Semester
 - ***Course Website***: https://course.ccs.neu.edu/cs2500/
